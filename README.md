@@ -1,13 +1,13 @@
 ## onyx-mongo
 
-Onyx plugin for mongo.
+Onyx plugin for Mongo DB.
 
 #### Installation
 
 In your project file:
 
 ```clojure
-[onyx-mongo "0.13.0.0"]
+[onyx-mongo "0.14.4.0"]
 ```
 
 In your peer boot-up namespace:
@@ -50,6 +50,6 @@ Pull requests into the master branch are welcomed.
 
 #### License
 
-Copyright © 2015 FIX ME
+Copyright © 2018 Arctype Corp.
 
 Distributed under the Eclipse Public License, the same as Clojure.
