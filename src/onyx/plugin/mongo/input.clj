@@ -72,6 +72,7 @@
 ;; from your task-map here, in order to improve the performance of your plugin
 ;; Extending the function below is likely good for most use cases.
 (defn input [event]
+  (throw (UnsupportedOperationException. "MongoDB input is not implemented"))
   (map->ExampleInput {:event event
                       :example-datasource (:mongo/example-datasource event)
                       :completed? (atom false)
