@@ -86,8 +86,10 @@
     true))
 
 (defn open-connection
-  [{:keys [onyx.core/task-map] :as event} lifecycle]
-  (assoc event ::conn (connect task-map)))
+  [{:keys [onyx.core/task-map onyx.core/params] :as event} lifecycle]
+  (let [conn (connect task-map)]
+    {::conn conn
+     :onyx.core/params (conj params conn)}))
 
 (defn close-connection
   [{:keys [onyx.core/task-map] :as event} lifecycle]
@@ -95,7 +97,8 @@
     (log/debug {:message "Closing mongo connection"
                 :db (:mongo/db task-map)})
     (mongo/close-connection conn))
-  (dissoc event ::conn))
+  {::conn nil
+   :onyx.core/params []})
 
 (def ^:private MongoInstance {:host S/Str (S/optional-key :port) S/Int})
 
@@ -126,3 +129,6 @@
 (defn output [{:keys [onyx.core/task-map]}]
   (S/validate MongoOutputTaskMap task-map)
   (map->MongoOutput {:task-map task-map}))
+
+(defn fetch [conn & args]
+  (mongo/with-mongo conn (apply mongo/fetch args)))
