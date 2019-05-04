@@ -5,4 +5,4 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.8.0" :scope "provided"]
                  [org.onyxplatform/onyx "0.14.4" :scope "provided"]
-                 [congomongo "1.1.0"]])
+                 [congomongo "1.1.1-SNAPSHOT"]])

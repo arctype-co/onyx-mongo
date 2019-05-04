@@ -23,6 +23,7 @@
   (let [conn (mongo/make-connection (:mongo/db task-map)
                          :instances (:mongo/instances task-map)
                          :options (:mongo/options task-map)
+                         :auth-db (:mongo/auth-db task-map)
                          :username (:mongo/username task-map)
                          :password (:mongo/password task-map))]
     (when-let [write-concern (:mongo/write-concern task-map)]
@@ -116,6 +117,7 @@
   {:mongo/db S/Str
    :mongo/instances [MongoInstance]
    (S/optional-key :mongo/options) {S/Keyword S/Any}
+   (S/optional-key :mongo/auth-db) S/Str
    (S/optional-key :mongo/username) S/Str
    (S/optional-key :mongo/password) S/Str
    (S/optional-key :mongo/write-concern) MongoWriteConcern
