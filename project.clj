@@ -1,4 +1,4 @@
-(defproject onyx-mongo "0.14.4.0-SNAPSHOT"
+(defproject arctype/onyx-mongo "0.14.4.0-SNAPSHOT"
   :description "Onyx plugin for Mongo DB"
   :url "https://github.com/arctype-co/onyx-mongo"
   :license {:name "Eclipse Public License"

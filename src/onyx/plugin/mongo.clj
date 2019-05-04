@@ -27,57 +27,63 @@
       (mongo/set-write-concern conn write-concern))
     conn))
 
+(def WriteOperation
+  {:op (S/enum :insert :update :remove)
+   :collection S/Keyword
+   (S/optional-key :query) S/Any
+   (S/optional-key :value) S/Any
+   (S/optional-key :options) {S/Keyword S/Any}})
+
+(S/defn ^:private write-op
+  [{:keys [op collection query value options] :as segment} :- WriteOperation]
+  (let [result (case op
+                 :insert (apply mongo/insert! collection value (apply concat options))
+                 :update (apply mongo/update! collection query value (apply concat options))
+                 :remove (apply mongo/destroy! collection query (apply concat options))
+                 (throw (ex-info "Undefined MongoDB operation"
+                                 segment)))]
+
+    (log/debug (merge {:message "Mongo write operation"
+                       :input segment
+                       :result result}))))
+
 (defrecord MongoOutput [task-map conn]
   p/Plugin
   (start [this event]
-    (as-> this
-      (assoc this :conn (connect task-map))))
+    (-> this
+        (assoc :conn (connect task-map))))
 
   (stop [this event]
     (mongo/close-connection conn)
     (dissoc this :conn))
 
   p/Checkpointed
-  ;; Nothing is required here. This is normally useful for checkpointing in
-  ;; input plugins.
   (checkpoint [this])
 
-  ;; Nothing is required here. This is normally useful for checkpointing in
-  ;; input plugins.
   (recover! [this replica-version checkpoint])
 
-  ;; Nothing is required here. This is normally useful for checkpointing in
-  ;; input plugins.
   (checkpointed! [this epoch])
 
   p/BarrierSynchronization
   (synced? [this epoch]
-    ;; Nothing is required here. This is commonly used to check whether all
-    ;; async writes have finished.
     true)
 
   (completed? [this]
-    ;; Nothing is required here. This is commonly used to check whether all
-    ;; async writes have finished (just like synced).
     true)
 
   p/Output
   (prepare-batch [this event replica messenger]
-    ;; Nothing is required here. This is useful for some initial preparation,
-    ;; before write-batch is called repeatedly.
     true)
 
-  (write-batch [this {:keys [onyx.core/write-batch mongo/example-datasink]} replica messenger]
-    ;; Write the batch to your datasink.
-    ;; In this case we are conjoining elements onto a collection.
-    (loop [batch write-batch]
-      (if-let [msg (first batch)]
-        (do
-          (swap! example-datasink conj msg)
+  (write-batch [{:keys [conn]} {:keys [onyx.core/write-batch]} replica messenger]
+    (mongo/with-mongo conn
+      (loop [batch write-batch]
+        (when-let [msg (first batch)]
+          (write-op msg)
           (recur (rest batch)))))
     true))
 
-(def ^:private MongoInstance {:host S/Str (S/optional-key :port) S/Str})
+(def ^:private MongoInstance {:host S/Str (S/optional-key :port) S/Int})
 
 ;    :errors-ignored will not report any errors - fire and forget  (:none)
 ;    :unacknowledged will report network errors - but does not wait for the write to be acknowledged  (:normal - this was the default prior to 0.4.0)
@@ -86,23 +92,18 @@
 ;    :fsynced waits until a write is sync'd to the filesystem  (:fsync-safe)
 ;    :replica-acknowledged waits until a write is sync'd to at least one replica as well  (:replicas-safe, :replica-safe)
 ;    :majority waits until a write is sync'd to a majority of replica nodes  (no previous equivalent)
-(def ^:private MongoWriteConcern
+(def MongoWriteConcern
   (S/enum :errors-ignored :unacknowledged :acknowledged :journaled :fsynced :replica-acknowledged :majority))
 
 (def MongoOutputTaskMap
-  {:mongo/db S/String
+  {:mongo/db S/Str
    :mongo/instances [MongoInstance]
    (S/optional-key :mongo/options) {S/Keyword S/Any}
    (S/optional-key :mongo/username) S/Str
    (S/optional-key :mongo/password) S/Str
-   (S/optional-key :mongo/write-concern) S/Str
+   (S/optional-key :mongo/write-concern) MongoWriteConcern
    (os/restricted-ns :mongo) S/Any})
 
-;; Builder function for your output plugin.
-;; Instantiates a record.
-;; It is highly recommended you inject and pre-calculate frequently used data 
-;; from your task-map here, in order to improve the performance of your plugin
-;; Extending the function below is likely good for most use cases.
 (defn output [{:keys [onyx.core/task-map]}]
   (S/validate MongoOutputTaskMap task-map)
   (map->MongoOutput {:task-map task-map}))
