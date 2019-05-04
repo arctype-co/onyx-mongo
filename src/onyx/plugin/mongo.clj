@@ -18,6 +18,8 @@
 
 (defn- connect
   [task-map]
+  (log/debug {:message "Opening mongo connection"
+              :db (:mongo/db task-map)})
   (let [conn (mongo/make-connection (:mongo/db task-map)
                          :instances (:mongo/instances task-map)
                          :options (:mongo/options task-map)
@@ -50,12 +52,12 @@
 (defrecord MongoOutput [task-map conn]
   p/Plugin
   (start [this event]
-    (-> this
-        (assoc :conn (connect task-map))))
+    ; Use lifecycles to connect
+    this)
 
   (stop [this event]
-    (mongo/close-connection conn)
-    (dissoc this :conn))
+    ; Use lifecycles to disconnect
+    this)
 
   p/Checkpointed
   (checkpoint [this])
@@ -75,13 +77,25 @@
   (prepare-batch [this event replica messenger]
     true)
 
-  (write-batch [{:keys [conn]} {:keys [onyx.core/write-batch]} replica messenger]
+  (write-batch [this {:keys [onyx.plugin.mongo/conn onyx.core/write-batch]} replica messenger]
     (mongo/with-mongo conn
       (loop [batch write-batch]
         (when-let [msg (first batch)]
           (write-op msg)
           (recur (rest batch)))))
     true))
+
+(defn open-connection
+  [{:keys [onyx.core/task-map] :as event} lifecycle]
+  (assoc event ::conn (connect task-map)))
+
+(defn close-connection
+  [{:keys [onyx.core/task-map] :as event} lifecycle]
+  (when-let [conn (::conn task-map)]
+    (log/debug {:message "Closing mongo connection"
+                :db (:mongo/db task-map)})
+    (mongo/close-connection conn))
+  (dissoc event ::conn))
 
 (def ^:private MongoInstance {:host S/Str (S/optional-key :port) S/Int})
 
@@ -103,6 +117,11 @@
    (S/optional-key :mongo/password) S/Str
    (S/optional-key :mongo/write-concern) MongoWriteConcern
    (os/restricted-ns :mongo) S/Any})
+
+(def connection-lifecycle
+  {:lifecycle/before-task-start open-connection
+   ;:lifecycle/handle-exception handle-exception
+   :lifecycle/after-task-stop close-connection})
 
 (defn output [{:keys [onyx.core/task-map]}]
   (S/validate MongoOutputTaskMap task-map)
