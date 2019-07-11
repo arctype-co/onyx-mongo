@@ -46,7 +46,7 @@
                  (throw (ex-info "Undefined MongoDB operation"
                                  segment)))]
 
-    (log/debug (merge {:message "Mongo write operation"
+    (log/trace (merge {:message "Mongo write operation"
                        :input segment
                        :result result}))))
 
